@@ -1,0 +1,16 @@
+{
+  "name": "routelight",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A lightweight Windows tray utility for monitoring network route status and AI service reachability.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="main.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RouteLight</title>
+  </head>
+  <body>
+    <div class="panel">
+      <header class="header" data-tauri-drag-region>
+        <div class="brand-block" data-tauri-drag-region>
+          <span class="title" data-tauri-drag-region>RouteLight</span>
+          <span class="subtitle" data-tauri-drag-region>Network route monitor</span>
+        </div>
+        <span id="status-badge" class="badge status-unknown" aria-live="polite">◆ UNKNOWN</span>
+      </header>
+
+      <section id="health-strip" class="health-strip status-unknown" aria-live="polite">
+        <div class="health-copy">
+          <span class="health-label">当前路由健康度</span>
+          <strong id="status-summary">等待检测结果</strong>
+        </div>
+        <span class="health-dot" aria-hidden="true"></span>
+      </section>
+
+      <div class="content">
+        <section class="section">
+          <div class="section-heading">
+            <div class="section-title">出口网络 / Exit Location</div>
+            <div class="section-note">公网出口与归属信息</div>
+          </div>
+          <div class="grid">
+            <div class="grid-label">IPv4 出口</div>
+            <div class="grid-value" id="ipv4-val">-</div>
+            <div class="grid-label">IPv6 出口</div>
+            <div class="grid-value" id="ipv6-val">-</div>
+            <div class="grid-label">位置</div>
+            <div class="grid-value" id="location-val">-</div>
+            <div class="grid-label">运营商</div>
+            <div class="grid-value" id="isp-val">-</div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <div class="section-title">AI 服务连通性 / AI Services</div>
+            <div class="section-note">握手状态、HTTP 响应与延迟</div>
+          </div>
+          <div class="service-list" id="services-list">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-heading">
+            <div class="section-title">本机状态 / Local Settings</div>
+            <div class="section-note">只读检测，不修改系统设置</div>
+          </div>
+          <div class="grid">
+            <div class="grid-label">系统代理</div>
+            <div class="grid-value" id="proxy-val">-</div>
+            <div class="grid-label">疑似 TUN / VPN / 虚拟网卡</div>
+            <div class="grid-value" id="tun-val">-</div>
+          </div>
+        </section>
+
+        <div id="alerts-container" class="alerts-container hidden" role="status" aria-live="polite">
+          <!-- Dynamically populated warnings/errors -->
+        </div>
+
+        <details class="debug-panel">
+          <summary>Debug Info</summary>
+          <pre id="debug-area" class="debug-area">Debug: Main window initialized</pre>
+        </details>
+      </div>
+
+      <footer class="footer">
+        <div class="time-label">上次更新: <span id="time-val">-</span></div>
+        <div class="actions">
+          <button id="refresh-btn" class="btn btn-primary" type="button">刷新</button>
+          <button id="copy-btn" class="btn" type="button">复制诊断</button>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
