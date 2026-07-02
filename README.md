@@ -25,6 +25,10 @@ npm run tauri build
 
 The default release artifact is the NSIS installer under `routelight/src-tauri/target/release/bundle/nsis/`.
 
+## Security Boundary
+
+RouteLight does not register startup entries by default. Only when the user explicitly enables "随系统启动" does RouteLight use the official Tauri autostart plugin to write system autostart configuration, and the user can disable it at any time.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE).

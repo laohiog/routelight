@@ -53,16 +53,23 @@
           </div>
         </section>
 
-        <section class="section">
+        <section class="section local-section">
           <div class="section-heading">
             <div class="section-title">本机状态 / Local Settings</div>
             <div class="section-note">只读检测，不修改系统设置</div>
           </div>
-          <div class="grid">
+          <div class="grid local-grid">
             <div class="grid-label">系统代理</div>
             <div class="grid-value" id="proxy-val">-</div>
             <div class="grid-label">疑似 TUN / VPN / 虚拟网卡</div>
             <div class="grid-value" id="tun-val">-</div>
+            <div class="grid-label autostart-label">随系统启动</div>
+            <div class="grid-value autostart-cell">
+              <label class="toggle-row">
+                <input id="autostart-toggle" type="checkbox" />
+                <span>开机后自动启动 RouteLight</span>
+              </label>
+            </div>
           </div>
         </section>
 

@@ -196,10 +196,36 @@ async fn get_cached_status() -> Option<RouteStatus> {
     get_cached_status_data()
 }
 
+#[tauri::command]
+fn get_autostart_status(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    app.autolaunch().is_enabled().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let autostart = app.autolaunch();
+    let result = if enabled {
+        autostart.enable()
+    } else {
+        autostart.disable()
+    };
+
+    result.map_err(|err| err.to_string())?;
+    autostart.is_enabled().map_err(|err| err.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None::<Vec<&'static str>>,
+        ))
         .setup(|app| {
             // 1. Load the initial status (blocking call since setup is sync)
             let status = tauri::async_runtime::block_on(async { get_status_data().await });
@@ -321,7 +347,9 @@ pub fn run() {
             get_status,
             refresh_status,
             get_cached_status,
-            copy_diagnostics
+            copy_diagnostics,
+            get_autostart_status,
+            set_autostart_enabled
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

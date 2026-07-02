@@ -29,3 +29,6 @@ tokio = { version = "1", features = ["macros"] }
 winreg = "0.52"
 ipconfig = "0.3"
 tauri-plugin-notification = "2"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2.5.1"

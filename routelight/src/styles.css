@@ -237,6 +237,63 @@ body {
   overflow-wrap: anywhere;
 }
 
+.local-grid {
+  grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+}
+
+.autostart-label,
+.autostart-cell {
+  grid-column: 1 / -1;
+}
+
+.autostart-label {
+  padding-bottom: 4px;
+  border-top: 1px solid var(--line-soft);
+  background: transparent;
+  color: #b7c2cf;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.autostart-cell {
+  padding-top: 0;
+  border-top: 0;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 0 1px;
+  color: var(--text);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.toggle-row input {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--normal);
+}
+
+.toggle-row span {
+  min-width: 0;
+  color: #d7dee8;
+  overflow-wrap: anywhere;
+}
+
+.toggle-row input:disabled {
+  cursor: progress;
+  opacity: 0.62;
+}
+
 .service-list {
   display: flex;
   flex-direction: column;

@@ -25,6 +25,7 @@ RouteLight is designed as a read-only diagnostic tray utility. It should remain 
 - It does not modify routing tables.
 - It does not switch VPN/proxy nodes.
 - It does not read browser cookies or credentials.
-- It does not create scheduled tasks or register startup entries.
+- It does not create scheduled tasks.
+- It does not register startup entries by default. Only when the user explicitly enables "随系统启动" does RouteLight use the official Tauri autostart plugin to write system autostart configuration, and the user can disable it at any time.
 
 Changes that expand system permissions, add shell execution, read local files, read clipboard contents, or upload diagnostics require explicit security review.

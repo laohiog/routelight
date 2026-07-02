@@ -39,6 +39,7 @@
     ],
     "windows": {
       "nsis": {
+        "template": "nsis/installer-template.nsi",
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "languages": ["SimpChinese"],

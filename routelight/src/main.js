@@ -6,6 +6,7 @@ let statusBadge;
 let ipv4Val, ipv6Val, locationVal, ispVal;
 let servicesList;
 let proxyVal, tunVal;
+let autostartToggle;
 let alertsContainer;
 let timeVal;
 let refreshBtn, copyBtn;
@@ -70,6 +71,37 @@ async function renderCachedStatus() {
   } catch (err) {
     const errMsg = err.message || JSON.stringify(err) || String(err);
     logDebug(`[frontend] cached status read failed: ${errMsg}`);
+  }
+}
+
+async function loadAutostartStatus() {
+  try {
+    logDebug("[frontend] reading autostart status");
+    const enabled = await invoke("get_autostart_status");
+    autostartToggle.checked = Boolean(enabled);
+    logDebug(`[frontend] autostart status: ${enabled ? "enabled" : "disabled"}`);
+  } catch (err) {
+    const errMsg = err.message || JSON.stringify(err) || String(err);
+    logDebug(`[frontend] autostart status read failed: ${errMsg}`);
+  }
+}
+
+async function setAutostartEnabled(event) {
+  const nextEnabled = event.target.checked;
+  const previousEnabled = !nextEnabled;
+
+  try {
+    autostartToggle.disabled = true;
+    logDebug(`[frontend] setting autostart: ${nextEnabled ? "enabled" : "disabled"}`);
+    const enabled = await invoke("set_autostart_enabled", { enabled: nextEnabled });
+    autostartToggle.checked = Boolean(enabled);
+    logDebug(`[frontend] autostart updated: ${enabled ? "enabled" : "disabled"}`);
+  } catch (err) {
+    const errMsg = err.message || JSON.stringify(err) || String(err);
+    autostartToggle.checked = previousEnabled;
+    logDebug(`[frontend] autostart update failed: ${errMsg}`);
+  } finally {
+    autostartToggle.disabled = false;
   }
 }
 
@@ -245,6 +277,7 @@ window.addEventListener("DOMContentLoaded", () => {
   servicesList = document.querySelector("#services-list");
   proxyVal = document.querySelector("#proxy-val");
   tunVal = document.querySelector("#tun-val");
+  autostartToggle = document.querySelector("#autostart-toggle");
   alertsContainer = document.querySelector("#alerts-container");
   timeVal = document.querySelector("#time-val");
   refreshBtn = document.querySelector("#refresh-btn");
@@ -279,10 +312,12 @@ window.addEventListener("DOMContentLoaded", () => {
   // Add Event Listeners
   refreshBtn.addEventListener("click", () => fetchStatus(true));
   copyBtn.addEventListener("click", copyDiagnostics);
+  autostartToggle.addEventListener("change", setAutostartEnabled);
   logDebug("[frontend] button click handlers registered");
 
   // Initial Load
   fetchStatus();
+  loadAutostartStatus();
 
   // Listen to menu-triggered refreshes from Rust
   listen("status-refreshed", (event) => {

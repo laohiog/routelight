@@ -11,6 +11,7 @@ Release candidate: v0.1.0-rc1
 - 显示 DNS 服务器、默认网关、最近 20 次出口 IPv4 变化历史。
 - 支持 Copy Diagnostics，将当前诊断快照写入剪贴板。
 - 托盘图标按状态显示绿色、黄色、红色或灰色。
+- 支持用户主动开启或关闭“随系统启动”。
 
 ## 安全边界
 
@@ -24,7 +25,7 @@ Release candidate: v0.1.0-rc1
 - 不上传诊断报告。
 - 不把诊断报告写入磁盘。
 - 不创建 Windows 计划任务。
-- 不注册开机自启动。
+- 默认不注册开机自启动项；仅当用户主动开启“随系统启动”时，RouteLight 才会通过 Tauri 官方 autostart 插件写入系统自启动配置；用户可随时关闭。
 - 不使用 PowerShell / cmd / shell 作为运行时逻辑。
 - 不提供 IP 纯净度评分。
 - 不提供代理节点、代理订阅或翻墙功能。
@@ -47,8 +48,16 @@ Release candidate: v0.1.0-rc1
 
 ## SHA256
 
-- `RouteLight_0.1.0_x64-setup.exe`: `A6C710791303CFBBC48AE4AD5AB9F8E584A0E35DBFA27EFC908113F63A9CE1C0`
-- `routelight.exe`: `9AAF8399720BFB97B22ED0D804940F4F2D5229853B1E0ADBAC6F234EABA5939C`
+SHA256 checksums should be generated from the final release artifacts and published alongside the GitHub Release assets.
+
+For local builds, generate checksums with:
+
+```powershell
+Get-FileHash .\src-tauri\target\release\bundle\nsis\RouteLight_0.1.0_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\src-tauri\target\release\routelight.exe -Algorithm SHA256
+```
+
+Do not treat checksums in source documentation as canonical if the binaries are rebuilt.
 
 ## 人工验收重点
 
