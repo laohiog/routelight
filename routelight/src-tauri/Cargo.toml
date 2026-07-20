@@ -1,6 +1,6 @@
 [package]
 name = "routelight"
-version = "0.1.0"
+version = "0.2.0"
 description = "A lightweight Windows tray utility for monitoring network route status and AI service reachability."
 authors = ["Chris Liu"]
 license = "MIT"

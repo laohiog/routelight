@@ -945,7 +945,7 @@ default-check.yourdomain.com 走默认代理策略组
   "ip": "104.xxx.xxx.xxx",
   "country": "US",
   "colo": "LAX",
-  "userAgent": "RouteLight/0.1.0",
+  "userAgent": "RouteLight/0.2.0",
   "timestamp": 1780000000
 }
 ```

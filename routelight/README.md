@@ -144,12 +144,12 @@ npm run tauri build
 编译产物将被输出在：
 
 * 免安装可执行文件：`src-tauri/target/release/routelight.exe`
-* NSIS 安装包：`src-tauri/target/release/bundle/nsis/RouteLight_0.1.0_x64-setup.exe`
+* NSIS 安装包：`src-tauri/target/release/bundle/nsis/RouteLight_0.2.0_x64-setup.exe`
   或匹配通配符：`RouteLight_*_x64-setup.exe`
 
-v0.1.0 默认仅构建并推荐分发 NSIS 安装包。MSI / WiX 打包链路暂不作为 v0.1.0 推荐分发产物；如后续需要 MSI，应单独修复并验证 WiX `light.exe` 打包流程后再启用。
+v0.2.0 默认仅构建并推荐分发 NSIS 安装包。MSI / WiX 打包链路暂不作为 v0.2.0 推荐分发产物；如后续需要 MSI，应单独修复并验证 WiX `light.exe` 打包流程后再启用。
 
-当前前端是无 bundler 的静态 HTML / CSS / JS，并通过 Tauri 注入的 `window.__TAURI__` 调用 `invoke`、`listen` 与窗口拖拽 API，因此 v0.1.0 暂时保留 `withGlobalTauri`。同时，Tauri 配置已启用最小 CSP，限制脚本、样式、图片和 IPC 连接来源。
+当前前端是无 bundler 的静态 HTML / CSS / JS，并通过 Tauri 注入的 `window.__TAURI__` 调用 `invoke`、`listen` 与窗口拖拽 API，因此 v0.2.0 暂时保留 `withGlobalTauri`。同时，Tauri 配置已启用最小 CSP，限制脚本、样式、图片和 IPC 连接来源。
 
 ---
 
