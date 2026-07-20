@@ -124,19 +124,18 @@ fn update_tray_and_notify(app: &tauri::AppHandle, status: &RouteStatus) {
             }
             // Transition to Error
             (_, OverallStatus::Error) => {
-                let has_openai_block = status
-                    .errors
-                    .iter()
-                    .any(|e| e.contains("OpenAI") || e.contains("ChatGPT"));
+                let has_google_ai_restriction =
+                    status.errors.iter().any(|e| e.contains("Google AI"));
                 let has_ipv6_risk = status.errors.iter().any(|e| e.contains("IPv6"));
 
-                if has_openai_block {
-                    let title = "OpenAI 生态可能不可达";
+                if has_google_ai_restriction {
+                    let title = "Google AI 当前不可用";
                     let body = status
                         .errors
-                        .first()
+                        .iter()
+                        .find(|error| error.contains("Google AI"))
                         .cloned()
-                        .unwrap_or_else(|| "ChatGPT / OpenAI API timeout".to_string());
+                        .unwrap_or_else(|| "Google AI 地区可用性检测失败".to_string());
                     send_notification(app, title, body.as_str());
                 } else if has_ipv6_risk {
                     let title = "检测到 IPv6 风险";

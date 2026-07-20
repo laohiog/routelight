@@ -12,11 +12,23 @@ pub enum OverallStatus {
     Unknown,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum AiProbeStatus {
+    Reachable,
+    Available,
+    RegionRestricted,
+    ManualCheck,
+    Unreachable,
+    Unknown,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AiServiceResult {
     pub name: String,
     pub url: String,
     pub reachable: bool,
+    pub probe_status: AiProbeStatus,
     pub status_code: Option<u16>,
     pub latency_ms: Option<u64>,
     pub error_type: Option<String>,
@@ -100,16 +112,21 @@ pub fn record_ip_if_changed(new_ip: &str, new_country: &str, new_asn: &str, time
     }
 }
 
-pub fn get_ai_status_label(reachable: bool, status_code: Option<u16>) -> String {
-    if !reachable {
-        return "不可达".to_string();
+pub fn get_ai_status_label(service: &AiServiceResult) -> String {
+    match service.probe_status {
+        AiProbeStatus::Available => return "可用".to_string(),
+        AiProbeStatus::RegionRestricted => return "地区不支持".to_string(),
+        AiProbeStatus::ManualCheck => return "需人工确认".to_string(),
+        AiProbeStatus::Unreachable => return "不可达".to_string(),
+        AiProbeStatus::Unknown => return "无法判定".to_string(),
+        AiProbeStatus::Reachable => {}
     }
-    if let Some(code) = status_code {
+
+    if let Some(code) = service.status_code {
         match code {
             200 | 301 | 302 => "可达".to_string(),
-            401 => "API 可达但未认证".to_string(),
             403 => "可达但受限".to_string(),
-            400 => "API 可达但请求无效".to_string(),
+            400 | 401 => "HTTP 可达但响应受限".to_string(),
             404 => "HTTP 可达但端点无效".to_string(),
             405 => "HTTP 可达但方法不允许".to_string(),
             _ => "HTTP 可达但响应异常".to_string(),
@@ -138,32 +155,27 @@ pub fn get_mock_status() -> RouteStatus {
                     name: "ChatGPT".to_string(),
                     url: "https://chatgpt.com".to_string(),
                     reachable: true,
+                    probe_status: AiProbeStatus::Reachable,
                     status_code: Some(200),
                     latency_ms: Some(183),
-                    error_type: Some("MOCK_DATA".to_string()),
-                },
-                AiServiceResult {
-                    name: "OpenAI API".to_string(),
-                    url: "https://api.openai.com/v1/models".to_string(),
-                    reachable: true,
-                    status_code: Some(401),
-                    latency_ms: Some(221),
                     error_type: Some("MOCK_DATA".to_string()),
                 },
                 AiServiceResult {
                     name: "Claude".to_string(),
                     url: "https://claude.ai".to_string(),
                     reachable: true,
+                    probe_status: AiProbeStatus::Reachable,
                     status_code: Some(200),
                     latency_ms: Some(205),
                     error_type: Some("MOCK_DATA".to_string()),
                 },
                 AiServiceResult {
-                    name: "Anthropic API".to_string(),
-                    url: "https://api.anthropic.com/v1/messages".to_string(),
+                    name: "Google AI".to_string(),
+                    url: "https://www.google.com/ai?hl=en".to_string(),
                     reachable: true,
-                    status_code: Some(400),
-                    latency_ms: Some(198),
+                    probe_status: AiProbeStatus::Available,
+                    status_code: Some(200),
+                    latency_ms: Some(192),
                     error_type: Some("MOCK_DATA".to_string()),
                 },
             ],
@@ -188,32 +200,27 @@ pub fn get_mock_status() -> RouteStatus {
                     name: "ChatGPT".to_string(),
                     url: "https://chatgpt.com".to_string(),
                     reachable: true,
+                    probe_status: AiProbeStatus::Reachable,
                     status_code: Some(200),
                     latency_ms: Some(183),
-                    error_type: Some("MOCK_DATA".to_string()),
-                },
-                AiServiceResult {
-                    name: "OpenAI API".to_string(),
-                    url: "https://api.openai.com/v1/models".to_string(),
-                    reachable: true,
-                    status_code: Some(401),
-                    latency_ms: Some(221),
                     error_type: Some("MOCK_DATA".to_string()),
                 },
                 AiServiceResult {
                     name: "Claude".to_string(),
                     url: "https://claude.ai".to_string(),
                     reachable: false,
+                    probe_status: AiProbeStatus::Unreachable,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("timeout".to_string()),
                 },
                 AiServiceResult {
-                    name: "Anthropic API".to_string(),
-                    url: "https://api.anthropic.com/v1/messages".to_string(),
+                    name: "Google AI".to_string(),
+                    url: "https://www.google.com/ai?hl=en".to_string(),
                     reachable: true,
-                    status_code: Some(400),
-                    latency_ms: Some(198),
+                    probe_status: AiProbeStatus::Available,
+                    status_code: Some(200),
+                    latency_ms: Some(192),
                     error_type: Some("MOCK_DATA".to_string()),
                 },
             ],
@@ -241,33 +248,28 @@ pub fn get_mock_status() -> RouteStatus {
                     name: "ChatGPT".to_string(),
                     url: "https://chatgpt.com".to_string(),
                     reachable: false,
+                    probe_status: AiProbeStatus::Unreachable,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("connection reset".to_string()),
-                },
-                AiServiceResult {
-                    name: "OpenAI API".to_string(),
-                    url: "https://api.openai.com/v1/models".to_string(),
-                    reachable: false,
-                    status_code: None,
-                    latency_ms: None,
-                    error_type: Some("timeout".to_string()),
                 },
                 AiServiceResult {
                     name: "Claude".to_string(),
                     url: "https://claude.ai".to_string(),
                     reachable: false,
+                    probe_status: AiProbeStatus::Unreachable,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("DNS failed".to_string()),
                 },
                 AiServiceResult {
-                    name: "Anthropic API".to_string(),
-                    url: "https://api.anthropic.com/v1/messages".to_string(),
-                    reachable: false,
-                    status_code: None,
-                    latency_ms: None,
-                    error_type: Some("connection reset".to_string()),
+                    name: "Google AI".to_string(),
+                    url: "https://www.google.com/ai?hl=en".to_string(),
+                    reachable: true,
+                    probe_status: AiProbeStatus::RegionRestricted,
+                    status_code: Some(200),
+                    latency_ms: Some(192),
+                    error_type: Some("region unsupported".to_string()),
                 },
             ],
             local_proxy: "Disabled".to_string(),
@@ -276,7 +278,7 @@ pub fn get_mock_status() -> RouteStatus {
             gateways: vec!["192.168.1.1".to_string()],
             warnings: vec![],
             errors: vec![
-                "All AI services are unreachable".to_string(),
+                "Google AI is unavailable for this region".to_string(),
                 "exit appears local/CN (IPv4)".to_string(),
             ],
         },
@@ -294,14 +296,7 @@ pub fn get_mock_status() -> RouteStatus {
                     name: "ChatGPT".to_string(),
                     url: "https://chatgpt.com".to_string(),
                     reachable: false,
-                    status_code: None,
-                    latency_ms: None,
-                    error_type: Some("unknown".to_string()),
-                },
-                AiServiceResult {
-                    name: "OpenAI API".to_string(),
-                    url: "https://api.openai.com/v1/models".to_string(),
-                    reachable: false,
+                    probe_status: AiProbeStatus::Unknown,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("unknown".to_string()),
@@ -310,14 +305,16 @@ pub fn get_mock_status() -> RouteStatus {
                     name: "Claude".to_string(),
                     url: "https://claude.ai".to_string(),
                     reachable: false,
+                    probe_status: AiProbeStatus::Unknown,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("unknown".to_string()),
                 },
                 AiServiceResult {
-                    name: "Anthropic API".to_string(),
-                    url: "https://api.anthropic.com/v1/messages".to_string(),
+                    name: "Google AI".to_string(),
+                    url: "https://www.google.com/ai?hl=en".to_string(),
                     reachable: false,
+                    probe_status: AiProbeStatus::Unknown,
                     status_code: None,
                     latency_ms: None,
                     error_type: Some("unknown".to_string()),
@@ -405,96 +402,70 @@ pub async fn get_real_status() -> RouteStatus {
         }
     }
 
-    // Evaluate AI services
-    let mut chatgpt_reachable = false;
-    let mut openai_reachable = false;
-    let mut claude_reachable = false;
-    let mut anthropic_reachable = false;
+    // Evaluate AI services. ChatGPT and Claude are connectivity probes; Google AI also
+    // verifies whether Google exposes AI Mode to this anonymous network path.
+    let chatgpt = ai_services.iter().find(|service| service.name == "ChatGPT");
+    let claude = ai_services.iter().find(|service| service.name == "Claude");
+    let google_ai = ai_services
+        .iter()
+        .find(|service| service.name == "Google AI");
 
-    // Check ChatGPT
-    if let Some(chat) = ai_services.iter().find(|a| a.name == "ChatGPT") {
-        chatgpt_reachable = chat.reachable;
-        if !chat.reachable {
-            let err_detail = chat.error_type.as_deref().unwrap_or("unknown");
-            warnings.push(format!("ChatGPT is unreachable: {}", err_detail));
-        } else if let Some(code) = chat.status_code {
-            if code != 200 && code != 301 && code != 302 {
-                warnings.push(format!(
-                    "ChatGPT returned HTTP {}; network is reachable but response is abnormal",
-                    code
-                ));
-            }
-        }
-    }
+    let chatgpt_reachable = chatgpt.map(|service| service.reachable).unwrap_or(false);
+    let claude_reachable = claude.map(|service| service.reachable).unwrap_or(false);
+    let google_reachable = google_ai.map(|service| service.reachable).unwrap_or(false);
+    let google_available = google_ai
+        .map(|service| service.probe_status == AiProbeStatus::Available)
+        .unwrap_or(false);
+    let all_ai_unreachable = !chatgpt_reachable && !claude_reachable && !google_reachable;
 
-    // Check OpenAI API
-    if let Some(oa) = ai_services.iter().find(|a| a.name == "OpenAI API") {
-        openai_reachable = oa.reachable;
-        if !oa.reachable {
-            let err_detail = oa.error_type.as_deref().unwrap_or("unknown");
-            warnings.push(format!("OpenAI API is unreachable: {}", err_detail));
-        } else if let Some(code) = oa.status_code {
-            if code == 404 || code >= 500 {
-                warnings.push(format!(
-                    "OpenAI API returned HTTP {}; network is reachable but response is abnormal",
-                    code
-                ));
-            }
-        }
-    }
-
-    // Check Claude & Anthropic API
-    if let Some(cl) = ai_services.iter().find(|a| a.name == "Claude") {
-        claude_reachable = cl.reachable;
-    }
-    if let Some(ant) = ai_services.iter().find(|a| a.name == "Anthropic API") {
-        anthropic_reachable = ant.reachable;
-    }
-
-    // Handle pair-wise blocking rules
-    if !chatgpt_reachable && !openai_reachable {
-        errors.push(
-            "Both ChatGPT and OpenAI API are unreachable (OpenAI ecosystem blocked)".to_string(),
-        );
-    }
-    if !claude_reachable && !anthropic_reachable {
-        errors.push(
-            "Both Claude and Anthropic API are unreachable (Anthropic ecosystem blocked)"
-                .to_string(),
-        );
+    if all_ai_unreachable {
+        errors.push("All AI services are unreachable".to_string());
     } else {
-        if !claude_reachable {
-            let err_detail = ai_services
-                .iter()
-                .find(|a| a.name == "Claude")
-                .and_then(|a| a.error_type.as_deref())
-                .unwrap_or("unknown");
-            warnings.push(format!("Claude is unreachable: {}", err_detail));
-        } else if let Some(cl) = ai_services.iter().find(|a| a.name == "Claude") {
-            if let Some(code) = cl.status_code {
-                if code != 200 && code != 301 && code != 302 {
-                    warnings.push(format!(
-                        "Claude returned HTTP {}; network is reachable but response is abnormal",
-                        code
-                    ));
+        for (name, service) in [("ChatGPT", chatgpt), ("Claude", claude)] {
+            match service {
+                Some(service) if !service.reachable => {
+                    let detail = service.error_type.as_deref().unwrap_or("unknown");
+                    warnings.push(format!("{name} is unreachable: {detail}"));
                 }
+                Some(service) => {
+                    if let Some(code) = service.status_code {
+                        if code != 200 && code != 301 && code != 302 {
+                            warnings.push(format!(
+                                "{name} returned HTTP {code}; network is reachable but response is abnormal"
+                            ));
+                        }
+                    }
+                }
+                None => warnings.push(format!("{name} probe returned no result")),
             }
         }
+    }
 
-        if !anthropic_reachable {
-            let err_detail = ai_services
-                .iter()
-                .find(|a| a.name == "Anthropic API")
-                .and_then(|a| a.error_type.as_deref())
-                .unwrap_or("unknown");
-            warnings.push(format!("Anthropic API is unreachable: {}", err_detail));
-        } else if let Some(ant) = ai_services.iter().find(|a| a.name == "Anthropic API") {
-            if let Some(code) = ant.status_code {
-                if code == 404 || code >= 500 {
-                    warnings.push(format!("Anthropic API returned HTTP {}; network is reachable but endpoint may be invalid", code));
-                }
-            }
+    match google_ai.map(|service| &service.probe_status) {
+        Some(AiProbeStatus::Available) => {}
+        Some(AiProbeStatus::RegionRestricted) => {
+            errors.push("Google AI is unavailable for this region".to_string());
         }
+        Some(AiProbeStatus::ManualCheck) => {
+            let detail = google_ai
+                .and_then(|service| service.error_type.as_deref())
+                .unwrap_or("manual verification required");
+            warnings.push(format!("Google AI requires manual verification: {detail}"));
+        }
+        Some(AiProbeStatus::Unreachable) if !all_ai_unreachable => {
+            let detail = google_ai
+                .and_then(|service| service.error_type.as_deref())
+                .unwrap_or("unknown");
+            warnings.push(format!("Google AI is unreachable: {detail}"));
+        }
+        Some(AiProbeStatus::Unknown) | Some(AiProbeStatus::Reachable) => {
+            let detail = google_ai
+                .and_then(|service| service.error_type.as_deref())
+                .unwrap_or("availability could not be determined");
+            warnings.push(format!("Google AI availability is unknown: {detail}"));
+        }
+        Some(AiProbeStatus::Unreachable) => {}
+        None => warnings.push("Google AI probe returned no result".to_string()),
     }
 
     // Determine Overall Status
@@ -530,12 +501,7 @@ pub async fn get_real_status() -> RouteStatus {
             _ => true, // Not present means no direct CN risk
         };
 
-        if ipv4_non_cn
-            && ipv6_non_cn
-            && chatgpt_reachable
-            && openai_reachable
-            && (claude_reachable || anthropic_reachable)
-        {
+        if ipv4_non_cn && ipv6_non_cn && chatgpt_reachable && claude_reachable && google_available {
             OverallStatus::Normal
         } else {
             OverallStatus::Warning
@@ -628,15 +594,8 @@ pub fn generate_diagnostics_text(status: &RouteStatus) -> String {
 
     text.push_str("[AI 服务]\n");
     for ai in &status.ai_services {
-        if let Some(ref err) = ai.error_type {
-            if err.contains("Stage 4 未实现") {
-                text.push_str(&format!("- {}：未检测（Stage 4 未实现）\n", ai.name));
-                continue;
-            }
-        }
-
         let mut parts = Vec::new();
-        let label = get_ai_status_label(ai.reachable, ai.status_code);
+        let label = get_ai_status_label(ai);
         parts.push(label);
 
         if let Some(code) = ai.status_code {
@@ -645,7 +604,10 @@ pub fn generate_diagnostics_text(status: &RouteStatus) -> String {
         if let Some(lat) = ai.latency_ms {
             parts.push(format!("{}ms", lat));
         }
-        if !ai.reachable {
+        if !matches!(
+            ai.probe_status,
+            AiProbeStatus::Reachable | AiProbeStatus::Available
+        ) {
             if let Some(ref err) = ai.error_type {
                 parts.push(err.clone());
             }
@@ -702,6 +664,59 @@ pub fn generate_diagnostics_text(status: &RouteStatus) -> String {
     text.push_str("[工具说明 / 已知限制]\n");
     text.push_str("- 本工具所显示的“系统代理”及“疑似虚拟网卡”信息仅作为本地网络拓扑的参考依据。\n");
     text.push_str("- 网络判定基于第三方 IP 地理库与实时端点握手，可能因服务商缓存、CDN 调度或临时网络抖动产生偏差。\n");
+    text.push_str("- Google AI 使用无账号、无 Cookie 的匿名页面探测；账号、语言、实验分组或验证码仍可能影响浏览器中的实际结果。\n");
 
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mock_states_use_chatgpt_claude_and_google_ai_only() {
+        let previous = env::var_os("ROUTELIGHT_MOCK_STATUS");
+
+        for mock_state in ["normal", "warning", "error", "unknown"] {
+            env::set_var("ROUTELIGHT_MOCK_STATUS", mock_state);
+            let status = get_mock_status();
+            let names: Vec<&str> = status
+                .ai_services
+                .iter()
+                .map(|service| service.name.as_str())
+                .collect();
+
+            assert_eq!(names, vec!["ChatGPT", "Claude", "Google AI"]);
+            let urls: Vec<&str> = status
+                .ai_services
+                .iter()
+                .map(|service| service.url.as_str())
+                .collect();
+            assert_eq!(
+                urls,
+                vec![
+                    "https://chatgpt.com",
+                    "https://claude.ai",
+                    "https://www.google.com/ai?hl=en"
+                ]
+            );
+        }
+
+        match previous {
+            Some(value) => env::set_var("ROUTELIGHT_MOCK_STATUS", value),
+            None => env::remove_var("ROUTELIGHT_MOCK_STATUS"),
+        }
+    }
+
+    #[test]
+    fn serializes_google_ai_probe_status_for_the_frontend() {
+        assert_eq!(
+            serde_json::to_string(&AiProbeStatus::RegionRestricted).unwrap(),
+            "\"region_restricted\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AiProbeStatus::ManualCheck).unwrap(),
+            "\"manual_check\""
+        );
+    }
 }

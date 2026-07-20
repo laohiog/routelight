@@ -1,6 +1,6 @@
 RouteLight 项目 PRD + 技术实施蓝图
 
-> **AI 代理路由状态灯：快速判断当前代理/VPN 是否适合使用 ChatGPT、OpenAI API、Claude、Anthropic API。**
+> **AI 代理路由状态灯：快速判断当前网络出口能否连接 ChatGPT、Claude，并使用 Google AI。**
 
 ---
 
@@ -28,7 +28,7 @@ Proxy Route Status
 ```text
 1. 当前公网出口 IP 是哪里？
 2. 当前 IPv6 有没有绕过代理的风险？
-3. ChatGPT / OpenAI API / Claude / Anthropic API 是否可达？
+3. ChatGPT / Claude 是否可达，Google AI 是否对当前出口开放？
 4. 出现异常时，能不能一键复制诊断信息给 AI 分析？
 ```
 
@@ -107,13 +107,12 @@ Electron 可以作为备选：
 6. 检测 IPv6 是否存在
 7. 显示国家 / 城市 / ASN / 运营商
 8. 检测 chatgpt.com 是否可达
-9. 检测 api.openai.com 是否可达
-10. 检测 claude.ai 是否可达
-11. 检测 anthropic.com 是否可达
-12. 读取 Windows 系统代理状态
-13. 检测疑似 TUN / Wintun / Clash / Mihomo / v2rayN 网络接口
-14. 出口 IP 变化时提示
-15. 一键复制诊断信息
+9. 检测 claude.ai 是否可达
+10. 匿名检测 google.com/ai 是否向当前出口开放 AI Mode
+11. 读取 Windows 系统代理状态
+12. 检测疑似 TUN / Wintun / Clash / Mihomo / v2rayN 网络接口
+13. 出口 IP 变化时提示
+14. 一键复制诊断信息
 ```
 
 第一版不要做：
@@ -151,7 +150,7 @@ routelight/
 │  │  ├─ probe/
 │  │  │  ├─ mod.rs
 │  │  │  ├─ ip_probe.rs          # IPv4 / IPv6 出口检测
-│  │  │  ├─ ai_probe.rs          # ChatGPT / Claude 连通性检测
+│  │  │  ├─ ai_probe.rs          # ChatGPT / Claude 连通性与 Google AI 可用性
 │  │  │  ├─ local_probe.rs       # 系统代理、网卡、DNS
 │  │  │  └─ score.rs             # 状态归类，不做纯净度评分
 │  │  ├─ diagnostics.rs          # 诊断信息生成
@@ -186,7 +185,7 @@ Rust 后端 probe_all()
 - 本机代理检测
 - IPv4 出口检测
 - IPv6 出口检测
-- AI 服务连通性检测
+- AI 服务连通性与 Google AI 可用性检测
         ↓
 生成 RouteStatus
         ↓
@@ -258,15 +257,14 @@ IPv6 与 IPv4 地区不一致 = 注意
 
 ---
 
-## 2. AI 服务连通性检测
+## 2. AI 服务连通性与 Google AI 可用性检测
 
 检测目标：
 
 ```text
 chatgpt.com
-api.openai.com
 claude.ai
-anthropic.com
+google.com/ai
 ```
 
 检测方式：
@@ -281,7 +279,7 @@ HTTP 请求
 错误类型
 ```
 
-不要只看 HTTP 状态码。
+不要只看 HTTP 状态码。ChatGPT 与 Claude 检查网络连通性；Google AI 还需要检查最终跳转地址和明确的地区限制页面。
 
 ### 判断规则
 
@@ -289,11 +287,17 @@ HTTP 请求
 HTTP 200 / 301 / 302：
 可达
 
-HTTP 401：
-API 域名通常可视为网络可达，只是没有认证
-
 HTTP 403：
 网络可达，但服务拒绝，可能是地区、风控、权限或访问方式问题
+
+Google AI 跳转到 `/search?udm=50`：
+当前匿名网络路径可进入 AI Mode
+
+Google 明确显示地区/语言不支持：
+当前出口地区不支持
+
+Google 验证码、Consent 或账号/设备限制：
+需人工确认，不能直接判定为地区不支持
 
 Timeout：
 不可达
@@ -312,18 +316,17 @@ Connection reset：
 
 ```text
 ChatGPT：可用 · 183ms
-OpenAI API：可达 · 401 · 221ms
 Claude：可用 · 205ms
-Anthropic API：可达 · 403 · 198ms
+Google AI：可用 · 200 · 192ms
 ```
 
 不要简单显示：
 
 ```text
-OpenAI API：失败
+Google AI：失败
 ```
 
-因为 `401` 往往代表“网络已通，但没有认证”。
+因为 Google 即使返回 HTTP 200，也可能展示地区不支持或需验证页面。
 
 ---
 
@@ -422,8 +425,8 @@ IPv6：风险 · CN · 中国电信 / 中国移动 / 中国联通
 ```text
 IPv4 出口非中国大陆
 ChatGPT 可达
-OpenAI API 可达
-Claude 或 Anthropic 至少一个可达
+Claude 可达
+Google AI 可用
 未检测到明显 IPv6 直连风险
 ```
 
@@ -442,7 +445,7 @@ Claude 或 Anthropic 至少一个可达
 ```text
 IPv4 出口正常，但 Claude 不可达
 IPv4 出口正常，但 ChatGPT 不可达
-OpenAI API 可达但 ChatGPT 页面不可达
+Google AI 需人工确认或无法判定
 检测到 IPv6，但 IPv6 与 IPv4 出口地区/ASN 不一致
 系统代理关闭，但出口 IP 仍然是代理出口
 检测接口部分失败
@@ -462,7 +465,8 @@ OpenAI API 可达但 ChatGPT 页面不可达
 
 ```text
 IPv4 出口为中国大陆
-ChatGPT / OpenAI API / Claude / Anthropic 全部不可达
+ChatGPT / Claude / Google AI 全部不可达
+Google 明确返回 AI Mode 地区不支持
 IPv6 出口为中国大陆且 IPv6 可用
 DNS 全部失败
 网络不可用
@@ -539,9 +543,8 @@ ASN        ASxxxx · Example ISP
 IPv6       未检测到
 
 ChatGPT       可用 · 183ms
-OpenAI API    可达 · 401 · 221ms
 Claude        可用 · 205ms
-Anthropic API 可达 · 403 · 198ms
+Google AI     可用 · 200 · 192ms
 
 系统代理   127.0.0.1:7890
 TUN        检测到 Wintun / Mihomo
@@ -613,22 +616,16 @@ IP 信息服务：
       "expected": ["200", "301", "302", "403"]
     },
     {
-      "name": "OpenAI API",
-      "url": "https://api.openai.com/v1/models",
-      "method": "GET",
-      "expected": ["200", "401", "403"]
-    },
-    {
       "name": "Claude",
       "url": "https://claude.ai",
       "method": "GET",
       "expected": ["200", "301", "302", "403"]
     },
     {
-      "name": "Anthropic API",
-      "url": "https://api.anthropic.com",
+      "name": "Google AI",
+      "url": "https://www.google.com/ai?hl=en",
       "method": "GET",
-      "expected": ["200", "401", "403"]
+      "expected": ["ai_mode_redirect", "region_restricted", "manual_check"]
     }
   ],
   "local_adapter_keywords": [
@@ -697,6 +694,7 @@ interface AiProbeResult {
   name: string;
   url: string;
   reachable: boolean;
+  probeStatus: "reachable" | "available" | "region_restricted" | "manual_check" | "unreachable" | "unknown";
   statusCode?: number;
   latencyMs?: number;
   phase: "dns" | "tcp" | "tls" | "http" | "done";
@@ -739,9 +737,8 @@ IPv6：未检测到
 
 [AI 服务]
 ChatGPT：可达，HTTP 200，183ms
-OpenAI API：可达，HTTP 401，221ms
 Claude：不可达，timeout
-Anthropic API：可达，HTTP 403，198ms
+Google AI：可用，HTTP 200，192ms
 
 [本机代理]
 系统代理：开启
@@ -751,7 +748,7 @@ PAC：无
 DNS：1.1.1.1, 8.8.8.8
 
 [风险提示]
-- Claude 页面不可达，但 Anthropic API 可达
+- Claude 页面不可达
 - 未检测到 IPv6 风险
 
 [最近出口变化]
@@ -827,9 +824,8 @@ DNS：1.1.1.1, 8.8.8.8
 - IPv4
 - IPv6 状态
 - ChatGPT 检测结果
-- OpenAI API 检测结果
 - Claude 检测结果
-- Anthropic API 检测结果
+- Google AI 可用性检测结果
 ```
 
 ---
@@ -1045,9 +1041,8 @@ VPN 失败
 
 ```text
 ChatGPT：不可达 · timeout
-OpenAI API：可达 · 401
 Claude：不可达 · DNS failed
-Anthropic API：可达 · 403
+Google AI：需人工确认 · Google verification required
 ```
 
 ---
@@ -1139,19 +1134,20 @@ IPv6 直连中国大陆运营商
 
 ---
 
-## 4. OpenAI API 返回 401
+## 4. Google AI 地区不支持
 
 条件：
 
 ```text
-api.openai.com 可连接，但没有 API Key
+google.com/ai 返回明确的地区或语言不支持页面，即使 HTTP 状态为 200
 ```
 
 期望：
 
 ```text
-OpenAI API：可达 · 401
-不要标记为网络失败
+Google AI：地区不支持
+状态：红色
+不要因为 HTTP 200 而标记为可用
 ```
 
 ---
@@ -1202,9 +1198,8 @@ ipify 不可用
 IPv4 出口
 IPv6 检测
 ChatGPT 检测
-OpenAI API 检测
 Claude 检测
-Anthropic API 检测
+Google AI 可用性检测
 状态灯
 复制诊断信息
 ```

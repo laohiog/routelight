@@ -151,35 +151,39 @@ function renderStatus(status) {
     let statusText = "";
     let statusClass = "unreachable";
 
-    if (service.error_type && service.error_type.includes("Stage 4 未实现")) {
-      statusText = "◆ 未检测";
-      statusClass = "unknown";
-    } else if (service.reachable) {
-      if (service.status_code === 200 || service.status_code === 301 || service.status_code === 302) {
-        statusText = "● 可达";
+    const probeStatus = service.probe_status || (service.reachable ? "reachable" : "unreachable");
+    switch (probeStatus) {
+      case "available":
+        statusText = "● 可用";
         statusClass = "reachable";
-      } else if (service.status_code === 401) {
-        statusText = "▲ API 可达但未认证";
+        break;
+      case "region_restricted":
+        statusText = "■ 地区不支持";
+        statusClass = "unreachable";
+        break;
+      case "manual_check":
+        statusText = "▲ 需人工确认";
         statusClass = "unauthorized";
-      } else if (service.status_code === 403) {
-        statusText = "▲ 可达但受限";
-        statusClass = "unauthorized";
-      } else if (service.status_code === 400) {
-        statusText = "▲ API 可达但请求无效";
-        statusClass = "unauthorized";
-      } else if (service.status_code === 404) {
-        statusText = "▲ HTTP 可达但端点无效";
-        statusClass = "unauthorized";
-      } else if (service.status_code === 405) {
-        statusText = "▲ HTTP 可达但方法不允许";
-        statusClass = "unauthorized";
-      } else {
-        statusText = "▲ HTTP 可达但响应异常";
-        statusClass = "unauthorized";
-      }
-    } else {
-      statusText = "■ 不可达";
-      statusClass = "unreachable";
+        break;
+      case "unknown":
+        statusText = "◆ 无法判定";
+        statusClass = "unknown";
+        break;
+      case "unreachable":
+        statusText = "■ 不可达";
+        statusClass = "unreachable";
+        break;
+      default:
+        if (service.status_code === 200 || service.status_code === 301 || service.status_code === 302) {
+          statusText = "● 可达";
+          statusClass = "reachable";
+        } else if (service.reachable) {
+          statusText = "▲ HTTP 可达但响应异常";
+          statusClass = "unauthorized";
+        } else {
+          statusText = "■ 不可达";
+          statusClass = "unreachable";
+        }
     }
 
     item.className = `service-item is-${statusClass}`;
@@ -191,15 +195,22 @@ function renderStatus(status) {
     const detailsSpan = document.createElement("span");
     detailsSpan.className = "service-latency";
 
-    if (service.error_type && service.error_type.includes("Stage 4 未实现")) {
-      detailsSpan.textContent = " · Stage 4 未实现";
-    } else if (service.reachable) {
-      const codePart = service.status_code ? ` · ${service.status_code}` : "";
-      const latencyPart = service.latency_ms !== null ? ` · ${service.latency_ms}ms` : "";
-      detailsSpan.textContent = `${codePart}${latencyPart}`;
-    } else if (service.error_type) {
-      detailsSpan.textContent = ` · ${service.error_type}`;
+    const detailParts = [];
+    if (service.status_code !== null && service.status_code !== undefined) {
+      detailParts.push(String(service.status_code));
     }
+    if (service.latency_ms !== null && service.latency_ms !== undefined) {
+      detailParts.push(`${service.latency_ms}ms`);
+    }
+    if (
+      service.error_type &&
+      service.error_type !== "MOCK_DATA" &&
+      probeStatus !== "available" &&
+      probeStatus !== "reachable"
+    ) {
+      detailParts.push(service.error_type);
+    }
+    detailsSpan.textContent = detailParts.map(part => ` · ${part}`).join("");
     statusGroup.appendChild(detailsSpan);
 
     item.appendChild(nameGroup);
