@@ -3120,7 +3120,7 @@ dependencies = [
 
 [[package]]
 name = "routelight"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -3817,7 +3817,6 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
- "image",
  "jni",
  "libc",
  "log",

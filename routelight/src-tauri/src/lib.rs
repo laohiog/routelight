@@ -1,5 +1,6 @@
 mod app_state;
 mod probe;
+mod tray_status;
 
 use app_state::{
     copy_diagnostics_data, get_cached_status_data, get_status_data, OverallStatus, RouteStatus,
@@ -17,36 +18,25 @@ const AUTO_REFRESH_INTERVAL_SECONDS: u64 = 60;
 static LAST_NOTIFIED_STATUS: Mutex<Option<OverallStatus>> = Mutex::new(None);
 static LAST_NOTIFIED_IP: Mutex<Option<String>> = Mutex::new(None);
 
+fn tray_image(status: &RouteStatus) -> Image<'static> {
+    Image::new_owned(
+        tray_status::render_tray_icon(status),
+        tray_status::TRAY_ICON_SIZE,
+        tray_status::TRAY_ICON_SIZE,
+    )
+}
+
 fn update_tray(app: &tauri::AppHandle, status: &RouteStatus) {
     if let Some(tray) = app.tray_by_id("default") {
-        let icon_bytes = match status.overall {
-            OverallStatus::Normal => include_bytes!("../icons/green.ico").as_slice(),
-            OverallStatus::Warning => include_bytes!("../icons/yellow.ico").as_slice(),
-            OverallStatus::Error => include_bytes!("../icons/red.ico").as_slice(),
-            OverallStatus::Unknown => include_bytes!("../icons/gray.ico").as_slice(),
-        };
-        let icon = match Image::from_bytes(icon_bytes) {
-            Ok(icon) => icon,
-            Err(err) => {
-                let _ = app.emit("debug-log", format!("[tray] load icon failed: {err}"));
-                match Image::from_bytes(include_bytes!("../icons/gray.ico").as_slice()) {
-                    Ok(icon) => icon,
-                    Err(fallback_err) => {
-                        let _ = app.emit(
-                            "debug-log",
-                            format!("[tray] load fallback icon failed: {fallback_err}"),
-                        );
-                        return;
-                    }
-                }
-            }
-        };
-
-        match tray.set_icon(Some(icon)) {
-            Ok(()) => println!("[tray] icon updated to status: {:?}", status.overall),
+        match tray.set_icon(Some(tray_image(status))) {
+            Ok(()) => println!("[tray] composite service icon updated"),
             Err(err) => {
                 let _ = app.emit("debug-log", format!("[tray] set_icon failed: {err}"));
             }
+        }
+
+        if let Err(err) = tray.set_tooltip(Some(tray_status::tray_tooltip(status))) {
+            let _ = app.emit("debug-log", format!("[tray] set_tooltip failed: {err}"));
         }
     }
 }
@@ -230,13 +220,8 @@ pub fn run() {
             let status = tauri::async_runtime::block_on(async { get_status_data().await });
             update_tray_and_notify(app.handle(), &status);
 
-            let icon_bytes = match status.overall {
-                OverallStatus::Normal => include_bytes!("../icons/green.ico").as_slice(),
-                OverallStatus::Warning => include_bytes!("../icons/yellow.ico").as_slice(),
-                OverallStatus::Error => include_bytes!("../icons/red.ico").as_slice(),
-                OverallStatus::Unknown => include_bytes!("../icons/gray.ico").as_slice(),
-            };
-            let icon = Image::from_bytes(icon_bytes).expect("Failed to load icon");
+            let icon = tray_image(&status);
+            let tooltip = tray_status::tray_tooltip(&status);
 
             // 2. Create menu items
             let open_item = MenuItemBuilder::with_id("open", "Open / 打开").build(app)?;
@@ -253,6 +238,7 @@ pub fn run() {
             // 4. Build the tray icon
             let _tray = TrayIconBuilder::with_id("default")
                 .icon(icon)
+                .tooltip(tooltip)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_tray_icon_event(|tray, event| {

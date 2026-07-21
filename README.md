@@ -5,6 +5,7 @@ RouteLight is a lightweight Windows Tauri tray utility for monitoring network ro
 The application source lives in [`routelight/`](routelight/). Start with the app README:
 
 - [RouteLight app README](routelight/README.md)
+- [v0.3.0 release notes](routelight/RELEASE_NOTES_v0.3.0.md)
 - [v0.2.0 release notes](routelight/RELEASE_NOTES_v0.2.0.md)
 - [v0.1.0-rc1 release notes](routelight/RELEASE_NOTES_v0.1.0-rc1.md)
 - [Technical blueprint](docs/technical-blueprint.md)
