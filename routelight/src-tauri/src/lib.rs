@@ -3,7 +3,8 @@ mod probe;
 mod tray_status;
 
 use app_state::{
-    copy_diagnostics_data, get_cached_status_data, get_status_data, OverallStatus, RouteStatus,
+    copy_ai_diagnostic_context_data, copy_diagnostics_data, get_cached_status_data,
+    get_status_data, OverallStatus, RouteStatus,
 };
 use std::sync::Mutex;
 use tauri::{
@@ -181,6 +182,11 @@ async fn copy_diagnostics() -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn copy_ai_diagnostic_context() -> Result<String, String> {
+    copy_ai_diagnostic_context_data().await
+}
+
+#[tauri::command]
 async fn get_cached_status() -> Option<RouteStatus> {
     get_cached_status_data()
 }
@@ -333,6 +339,7 @@ pub fn run() {
             refresh_status,
             get_cached_status,
             copy_diagnostics,
+            copy_ai_diagnostic_context,
             get_autostart_status,
             set_autostart_enabled
         ])

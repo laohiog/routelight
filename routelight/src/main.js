@@ -9,7 +9,7 @@ let proxyVal, tunVal, dnsVal;
 let autostartToggle;
 let alertsContainer;
 let timeVal;
-let refreshBtn, copyBtn;
+let refreshBtn, copyBtn, aiContextBtn;
 let debugArea;
 let healthStrip, statusSummary;
 
@@ -276,6 +276,25 @@ async function copyDiagnostics() {
   }
 }
 
+async function copyAiDiagnosticContext() {
+  try {
+    logDebug("[frontend] AI context button clicked");
+    aiContextBtn.disabled = true;
+    await invoke("copy_ai_diagnostic_context");
+    aiContextBtn.textContent = "已复制";
+    logDebug("AI diagnostic context copied successfully");
+  } catch (err) {
+    const errMsg = err.message || JSON.stringify(err) || String(err);
+    logDebug(`[frontend] AI context copy failed: ${errMsg}`);
+    aiContextBtn.textContent = "复制失败";
+  } finally {
+    setTimeout(() => {
+      aiContextBtn.textContent = "AI 上下文";
+      aiContextBtn.disabled = false;
+    }, 1000);
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   // Bind Debug Area first
   debugArea = document.querySelector("#debug-area");
@@ -298,6 +317,7 @@ window.addEventListener("DOMContentLoaded", () => {
   timeVal = document.querySelector("#time-val");
   refreshBtn = document.querySelector("#refresh-btn");
   copyBtn = document.querySelector("#copy-btn");
+  aiContextBtn = document.querySelector("#ai-context-btn");
   healthStrip = document.querySelector("#health-strip");
   statusSummary = document.querySelector("#status-summary");
 
@@ -328,6 +348,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Add Event Listeners
   refreshBtn.addEventListener("click", () => fetchStatus(true));
   copyBtn.addEventListener("click", copyDiagnostics);
+  aiContextBtn.addEventListener("click", copyAiDiagnosticContext);
   autostartToggle.addEventListener("change", setAutostartEnabled);
   logDebug("[frontend] button click handlers registered");
 

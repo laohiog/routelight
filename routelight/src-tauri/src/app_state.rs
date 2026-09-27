@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -576,6 +577,19 @@ pub async fn copy_diagnostics_data() -> Result<String, String> {
     Err("Failed to write to clipboard".to_string())
 }
 
+pub async fn copy_ai_diagnostic_context_data() -> Result<String, String> {
+    let status =
+        get_cached_status_data().ok_or_else(|| "RouteLight status is not ready yet".to_string())?;
+    let text = generate_ai_diagnostic_context_text(&status);
+    if let Ok(mut ctx) = arboard::Clipboard::new() {
+        if ctx.set_text(text.clone()).is_ok() {
+            println!("[menu] copy AI diagnostic context");
+            return Ok(text);
+        }
+    }
+    Err("Failed to write to clipboard".to_string())
+}
+
 pub fn generate_diagnostics_text(status: &RouteStatus) -> String {
     let mut text = String::new();
     text.push_str("RouteLight 诊断信息\n");
@@ -669,9 +683,387 @@ pub fn generate_diagnostics_text(status: &RouteStatus) -> String {
     text
 }
 
+fn ai_context_ipv6_state(value: &str) -> &'static str {
+    let normalized = value.trim().to_ascii_lowercase();
+    if normalized.contains("not detected") || value.contains("未检测到") {
+        "not detected"
+    } else if normalized.is_empty()
+        || normalized.contains("failed")
+        || value.contains("失败")
+        || normalized.contains("unknown")
+    {
+        "query failed"
+    } else {
+        "detected"
+    }
+}
+
+fn ai_context_proxy_state(value: &str) -> &'static str {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "" | "unknown" => "unknown",
+        "disabled" => "disabled",
+        _ => "configured",
+    }
+}
+
+fn add_ip_literals_to_redactions(value: &str, redactions: &mut Vec<String>) {
+    let mut candidate = String::new();
+    for character in value.chars().chain(std::iter::once(' ')) {
+        if character.is_ascii_hexdigit() || matches!(character, '.' | ':' | '%') {
+            candidate.push(character);
+        } else {
+            let address = candidate.split('%').next().unwrap_or_default();
+            if let Ok(parsed) = address.parse::<IpAddr>() {
+                redactions.push(address.to_string());
+                redactions.push(parsed.to_string());
+            }
+            candidate.clear();
+        }
+    }
+}
+
+fn ai_context_redactions(status: &RouteStatus, history: &[IpChangeEntry]) -> Vec<String> {
+    let mut redactions = Vec::new();
+    add_ip_literals_to_redactions(&status.ipv4, &mut redactions);
+    add_ip_literals_to_redactions(&status.ipv6, &mut redactions);
+
+    if ai_context_proxy_state(&status.local_proxy) == "configured" {
+        redactions.push(status.local_proxy.clone());
+        if let Some(pac_index) = status.local_proxy.to_ascii_lowercase().find("pac:") {
+            redactions.push(status.local_proxy[pac_index + 4..].trim().to_string());
+        }
+    }
+
+    for gateway in &status.gateways {
+        redactions.push(gateway.clone());
+        add_ip_literals_to_redactions(gateway, &mut redactions);
+    }
+    for entry in history {
+        redactions.push(entry.old_ip.clone());
+        redactions.push(entry.new_ip.clone());
+        add_ip_literals_to_redactions(&entry.old_ip, &mut redactions);
+        add_ip_literals_to_redactions(&entry.new_ip, &mut redactions);
+    }
+
+    redactions.retain(|value| !value.is_empty());
+    redactions.sort();
+    redactions.dedup();
+    redactions.sort_by(|left, right| right.len().cmp(&left.len()));
+    redactions
+}
+
+fn redact_ai_context_value(value: &str, redactions: &[String]) -> String {
+    redactions.iter().fold(value.to_string(), |text, value| {
+        text.replace(value, "[已省略]")
+    })
+}
+
+fn redact_ai_context_dns_value(value: &str, redactions: &[String]) -> String {
+    if let Ok(address) = value.trim().parse::<IpAddr>() {
+        let is_sensitive = redactions.iter().any(|redaction| {
+            redaction == value || redaction.parse::<IpAddr>().ok() == Some(address)
+        });
+        if is_sensitive {
+            "[已省略]".to_string()
+        } else {
+            value.to_string()
+        }
+    } else {
+        redact_ai_context_value(value, redactions)
+    }
+}
+
+pub fn generate_ai_diagnostic_context_text(status: &RouteStatus) -> String {
+    let history = IP_HISTORY.lock().unwrap().clone();
+    format_ai_diagnostic_context_with_history(status, &history)
+}
+
+fn format_ai_diagnostic_context_with_history(
+    status: &RouteStatus,
+    history: &[IpChangeEntry],
+) -> String {
+    let redactions = ai_context_redactions(status, history);
+    let safe = |value: &str| redact_ai_context_value(value, &redactions);
+    let mut text = String::new();
+
+    text.push_str("RouteLight AI 诊断上下文\n");
+    text.push_str("=====================================\n\n");
+    text.push_str("[用户问题]\n");
+    text.push_str("请在发送给 AI 前补充：实际症状、开始时间、影响范围。\n\n");
+
+    text.push_str("[观察事实]\n");
+    text.push_str(&format!("检测时间：{}\n", safe(&status.checked_at)));
+    text.push_str(&format!("RouteLight 总体状态：{:?}\n", status.overall));
+    text.push_str(&format!(
+        "IPv4 地区：{} / {}\n",
+        safe(&status.country),
+        safe(&status.city)
+    ));
+    text.push_str(&format!(
+        "ASN / ISP：{} / {}\n",
+        safe(&status.asn),
+        safe(&status.isp)
+    ));
+    text.push_str(&format!(
+        "IPv6 状态：{}\n",
+        ai_context_ipv6_state(&status.ipv6)
+    ));
+
+    for service in &status.ai_services {
+        let mut details = vec![safe(&get_ai_status_label(service))];
+        if let Some(code) = service.status_code {
+            details.push(format!("HTTP {code}"));
+        }
+        if let Some(latency) = service.latency_ms {
+            details.push(format!("{latency}ms"));
+        }
+        if !matches!(
+            service.probe_status,
+            AiProbeStatus::Reachable | AiProbeStatus::Available
+        ) {
+            if let Some(error_type) = &service.error_type {
+                if error_type != "MOCK_DATA" {
+                    details.push(safe(error_type));
+                }
+            }
+        }
+        text.push_str(&format!(
+            "{}：{}\n",
+            safe(&service.name),
+            details.join("，")
+        ));
+    }
+
+    text.push_str(&format!(
+        "系统代理状态：{}\n",
+        ai_context_proxy_state(&status.local_proxy)
+    ));
+    let adapters: Vec<String> = status
+        .tun_adapters
+        .iter()
+        .map(|value| safe(value))
+        .collect();
+    text.push_str(&format!(
+        "疑似 TUN / VPN / 虚拟网卡：{}\n",
+        if adapters.is_empty() {
+            "无".to_string()
+        } else {
+            adapters.join(", ")
+        }
+    ));
+    let dns_servers: Vec<String> = status
+        .dns_servers
+        .iter()
+        .map(|value| redact_ai_context_dns_value(value, &redactions))
+        .collect();
+    text.push_str(&format!(
+        "DNS 服务器：{}\n\n",
+        if dns_servers.is_empty() {
+            "无".to_string()
+        } else {
+            dns_servers.join(", ")
+        }
+    ));
+
+    text.push_str("[RouteLight 警告与错误]\n");
+    if status.warnings.is_empty() && status.errors.is_empty() {
+        text.push_str("- 无\n\n");
+    } else {
+        for warning in &status.warnings {
+            text.push_str(&format!("- 警告：{}\n", safe(warning)));
+        }
+        for error in &status.errors {
+            text.push_str(&format!("- 错误：{}\n", safe(error)));
+        }
+        text.push('\n');
+    }
+
+    text.push_str("[最近出口变化（原始 IP 已脱敏）]\n");
+    if history.is_empty() {
+        text.push_str("- 无内存记录\n\n");
+    } else {
+        for entry in history.iter().rev() {
+            text.push_str(&format!(
+                "- {}：检测到 IPv4 出口变化（前后地址已省略）；新出口地区：{}，ASN：{}\n",
+                safe(&entry.timestamp),
+                safe(&entry.country),
+                safe(&entry.asn)
+            ));
+        }
+        text.push('\n');
+    }
+
+    text.push_str("[隐私与脱敏说明]\n");
+    text.push_str("此上下文由 RouteLight 在本地基于现有内存状态生成；只有在你显式点击“AI 上下文”后才复制到剪贴板。RouteLight 不会自动上传或向任何 AI 服务发送这些内容。\n");
+    text.push_str("已省略敏感或不必要的原始网络标识：当前公网 IPv4 / IPv6、历史原始公网 IP、原始代理服务器字符串、PAC URL、默认网关。内容不包含凭据、令牌、订阅链接、Cookie 或本地文件内容。\n\n");
+
+    text.push_str("[给 AI 的分析要求]\n");
+    text.push_str("请分析以上上下文，并遵循以下要求：\n");
+    text.push_str("1. 将观察事实与推断分开。\n");
+    text.push_str("2. 列出不超过 3 个可能原因。\n");
+    text.push_str("3. 为每个原因引用支持它的 RouteLight 证据。\n");
+    text.push_str("4. 证据不足时明确说明。\n");
+    text.push_str("5. 提出最小且有用的下一步诊断测试。\n");
+    text.push_str(
+        "6. 不要假设你已获准修改代理设置、路由、防火墙、VPN 客户端、NAS、VPS 或其他系统。\n",
+    );
+
+    text
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_ai_context_status() -> RouteStatus {
+        RouteStatus {
+            overall: OverallStatus::Warning,
+            checked_at: "2026-09-27 10:00:00".to_string(),
+            ipv4: "104.16.0.1".to_string(),
+            ipv6: "240e:0000:0000:0000:0000:0000:0000:1234".to_string(),
+            country: "US".to_string(),
+            city: "Los Angeles".to_string(),
+            asn: "AS13335".to_string(),
+            isp: "Cloudflare, Inc.".to_string(),
+            ai_services: vec![
+                AiServiceResult {
+                    name: "ChatGPT".to_string(),
+                    url: "https://chatgpt.com".to_string(),
+                    reachable: true,
+                    probe_status: AiProbeStatus::Reachable,
+                    status_code: Some(200),
+                    latency_ms: Some(183),
+                    error_type: None,
+                },
+                AiServiceResult {
+                    name: "Claude".to_string(),
+                    url: "https://claude.ai".to_string(),
+                    reachable: false,
+                    probe_status: AiProbeStatus::Unreachable,
+                    status_code: None,
+                    latency_ms: None,
+                    error_type: Some("timeout".to_string()),
+                },
+                AiServiceResult {
+                    name: "Google AI".to_string(),
+                    url: "https://www.google.com/ai?hl=en".to_string(),
+                    reachable: true,
+                    probe_status: AiProbeStatus::Available,
+                    status_code: Some(200),
+                    latency_ms: Some(192),
+                    error_type: None,
+                },
+            ],
+            local_proxy: "127.0.0.1:7890".to_string(),
+            tun_adapters: vec!["Wintun".to_string()],
+            dns_servers: vec!["1.1.1.1".to_string(), "8.8.8.8".to_string()],
+            gateways: vec!["192.168.1.1".to_string()],
+            warnings: vec!["Claude is unreachable: timeout".to_string()],
+            errors: vec![],
+        }
+    }
+
+    fn sample_ai_context_history() -> Vec<IpChangeEntry> {
+        vec![IpChangeEntry {
+            timestamp: "2026-09-27 09:30:00".to_string(),
+            old_ip: "198.51.100.10".to_string(),
+            new_ip: "104.16.0.1".to_string(),
+            country: "US".to_string(),
+            asn: "AS13335".to_string(),
+        }]
+    }
+
+    #[test]
+    fn ai_context_contains_required_sections_facts_and_instructions() {
+        let status = sample_ai_context_status();
+        let history = sample_ai_context_history();
+        let context = format_ai_diagnostic_context_with_history(&status, &history);
+
+        for required in [
+            "RouteLight AI 诊断上下文",
+            "[用户问题]",
+            "[观察事实]",
+            "[最近出口变化（原始 IP 已脱敏）]",
+            "[隐私与脱敏说明]",
+            "[给 AI 的分析要求]",
+            "请在发送给 AI 前补充：实际症状、开始时间、影响范围。",
+            "ChatGPT",
+            "Claude",
+            "Google AI",
+            "1.1.1.1, 8.8.8.8",
+            "不超过 3 个可能原因",
+            "证据不足时明确说明",
+            "不要假设你已获准修改代理设置",
+        ] {
+            assert!(
+                context.contains(required),
+                "missing required text: {required}"
+            );
+        }
+        assert!(context.contains("183ms"));
+        assert!(context.contains("HTTP 200"));
+        assert!(context.contains("timeout"));
+        assert!(context.contains("IPv6 状态：detected"));
+        assert!(context.contains("系统代理状态：configured"));
+        assert!(context.contains("Wintun"));
+    }
+
+    #[test]
+    fn ai_context_redacts_current_historical_proxy_pac_and_gateway_values() {
+        let mut status = sample_ai_context_status();
+        let history = sample_ai_context_history();
+        let proxy = status.local_proxy.clone();
+        let gateway = status.gateways[0].clone();
+        status.dns_servers.push(status.ipv4.clone());
+        status.warnings.push(format!(
+            "Raw diagnostic details: {} {} {} {}",
+            status.ipv4, status.ipv6, proxy, gateway
+        ));
+
+        let context = format_ai_diagnostic_context_with_history(&status, &history);
+        for sensitive in [
+            status.ipv4.as_str(),
+            status.ipv6.as_str(),
+            "240e::1234",
+            proxy.as_str(),
+            gateway.as_str(),
+            history[0].old_ip.as_str(),
+            history[0].new_ip.as_str(),
+        ] {
+            assert!(!context.contains(sensitive), "context exposed {sensitive}");
+        }
+
+        let pac_url = "https://proxy.example/config.pac?token=secret";
+        status.local_proxy = format!("PAC: {pac_url}");
+        status.warnings = vec![format!("PAC detail: {pac_url}")];
+        let context = format_ai_diagnostic_context_with_history(&status, &history);
+        assert!(!context.contains(pac_url));
+        assert!(!context.contains("token=secret"));
+    }
+
+    #[test]
+    fn ai_context_preserves_dns_address_sharing_a_gateway_prefix() {
+        let mut status = sample_ai_context_status();
+        status.dns_servers = vec!["192.168.1.10".to_string()];
+        let history = sample_ai_context_history();
+
+        let context = format_ai_diagnostic_context_with_history(&status, &history);
+
+        assert!(context.contains("DNS 服务器：192.168.1.10"));
+    }
+
+    #[test]
+    fn ai_context_reports_coarse_ipv6_and_proxy_states() {
+        assert_eq!(ai_context_ipv6_state("Not detected"), "not detected");
+        assert_eq!(
+            ai_context_ipv6_state("IPv6 查询失败: timeout"),
+            "query failed"
+        );
+        assert_eq!(ai_context_ipv6_state("240e::1234"), "detected");
+        assert_eq!(ai_context_proxy_state("Disabled"), "disabled");
+        assert_eq!(ai_context_proxy_state("Unknown"), "unknown");
+        assert_eq!(ai_context_proxy_state("127.0.0.1:7890"), "configured");
+    }
 
     #[test]
     fn mock_states_use_chatgpt_claude_and_google_ai_only() {
