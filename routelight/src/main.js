@@ -5,7 +5,7 @@ const { listen } = window.__TAURI__.event;
 let statusBadge;
 let ipv4Val, ipv6Val, locationVal, ispVal;
 let servicesList;
-let proxyVal, tunVal, dnsVal;
+let proxyVal, tunVal, dnsVal, gatewayVal;
 let autostartToggle;
 let alertsContainer;
 let timeVal;
@@ -227,6 +227,10 @@ function renderStatus(status) {
     ? status.dns_servers.filter(server => typeof server === "string" && server.trim().length > 0)
     : [];
   dnsVal.textContent = dnsServers.length > 0 ? dnsServers.join(", ") : "无";
+  const gateways = Array.isArray(status.gateways)
+    ? status.gateways.filter(gateway => typeof gateway === "string" && gateway.trim().length > 0)
+    : [];
+  gatewayVal.textContent = gateways.length > 0 ? gateways.join(", ") : "无";
 
   // 5. Update Time
   timeVal.textContent = status.checked_at || "-";
@@ -312,6 +316,7 @@ window.addEventListener("DOMContentLoaded", () => {
   proxyVal = document.querySelector("#proxy-val");
   tunVal = document.querySelector("#tun-val");
   dnsVal = document.querySelector("#dns-val");
+  gatewayVal = document.querySelector("#gateway-val");
   autostartToggle = document.querySelector("#autostart-toggle");
   alertsContainer = document.querySelector("#alerts-container");
   timeVal = document.querySelector("#time-val");
