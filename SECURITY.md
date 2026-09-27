@@ -4,13 +4,15 @@
 
 | Version | Supported |
 | ------- | --------- |
-| v0.1.x  | Yes       |
+| v0.3.x  | Yes       |
+| v0.2.x  | No        |
+| v0.1.x  | No        |
 
 ## Reporting a Vulnerability
 
-Please do not disclose security vulnerabilities in public issues before the maintainer has had time to review them.
+Please do not report undisclosed vulnerabilities in public Issues. Use the repository's Security tab and the “Report a vulnerability” flow to submit a private vulnerability report.
 
-For now, please report security issues by opening a private contact channel with the maintainer before publishing details. Include a concise description, reproduction steps if available, affected version, and any relevant logs or screenshots that do not contain secrets.
+Include the affected version and a concise description, reproduction steps if available, and relevant logs or screenshots only when they do not contain secrets.
 
 ## Security Boundaries
 
@@ -18,7 +20,7 @@ RouteLight is designed as a read-only diagnostic tray utility. It should remain 
 
 - It does not capture packets.
 - It does not read clipboard contents.
-- It writes to the clipboard only when the user clicks Copy Diagnostics.
+- It writes diagnostic text to the clipboard only after an explicit user action: Copy Diagnostics / 复制诊断 or AI diagnostic context / AI 上下文.
 - It does not upload diagnostic reports.
 - It does not write diagnostic reports to disk.
 - It does not modify Windows proxy settings.
