@@ -748,7 +748,7 @@ fn ai_context_redactions(status: &RouteStatus, history: &[IpChangeEntry]) -> Vec
     redactions.retain(|value| !value.is_empty());
     redactions.sort();
     redactions.dedup();
-    redactions.sort_by(|left, right| right.len().cmp(&left.len()));
+    redactions.sort_by_key(|left| std::cmp::Reverse(left.len()));
     redactions
 }
 
