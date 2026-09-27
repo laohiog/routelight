@@ -9,6 +9,20 @@ pub struct LocalNetworkInfo {
     pub gateways: Vec<String>,
 }
 
+fn format_system_proxy(proxy_enable: u32, proxy_server: &str, auto_config_url: &str) -> String {
+    let manual_proxy_enabled = proxy_enable == 1 && !proxy_server.is_empty();
+
+    if manual_proxy_enabled && !auto_config_url.is_empty() {
+        format!("Manual: {} | PAC: {}", proxy_server, auto_config_url)
+    } else if manual_proxy_enabled {
+        proxy_server.to_string()
+    } else if !auto_config_url.is_empty() {
+        format!("PAC: {}", auto_config_url)
+    } else {
+        "Disabled".to_string()
+    }
+}
+
 pub fn get_system_proxy() -> String {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let subkey = "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
@@ -18,13 +32,7 @@ pub fn get_system_proxy() -> String {
         let proxy_server: String = key.get_value("ProxyServer").unwrap_or_default();
         let auto_config_url: String = key.get_value("AutoConfigURL").unwrap_or_default();
 
-        if proxy_enable == 1 && !proxy_server.is_empty() {
-            proxy_server
-        } else if !auto_config_url.is_empty() {
-            format!("PAC: {}", auto_config_url)
-        } else {
-            "Disabled".to_string()
-        }
+        format_system_proxy(proxy_enable, &proxy_server, &auto_config_url)
     } else {
         "Disabled".to_string()
     }
@@ -89,5 +97,44 @@ pub fn probe_local_network() -> LocalNetworkInfo {
         tun_adapters,
         dns_servers,
         gateways,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_system_proxy;
+
+    #[test]
+    fn formats_enabled_manual_proxy_and_pac_together() {
+        assert_eq!(
+            format_system_proxy(1, "127.0.0.1:7890", "https://proxy.example/pac"),
+            "Manual: 127.0.0.1:7890 | PAC: https://proxy.example/pac"
+        );
+    }
+
+    #[test]
+    fn preserves_manual_proxy_value_when_pac_is_absent() {
+        assert_eq!(
+            format_system_proxy(1, "http=proxy:80;https=proxy:443", ""),
+            "http=proxy:80;https=proxy:443"
+        );
+    }
+
+    #[test]
+    fn reports_pac_when_manual_proxy_is_not_enabled() {
+        assert_eq!(
+            format_system_proxy(0, "", "https://proxy.example/pac"),
+            "PAC: https://proxy.example/pac"
+        );
+    }
+
+    #[test]
+    fn reports_disabled_when_neither_proxy_source_is_available() {
+        assert_eq!(format_system_proxy(0, "", ""), "Disabled");
+    }
+
+    #[test]
+    fn ignores_stale_manual_proxy_when_manual_proxy_is_not_enabled() {
+        assert_eq!(format_system_proxy(0, "stale-proxy:8080", ""), "Disabled");
     }
 }
