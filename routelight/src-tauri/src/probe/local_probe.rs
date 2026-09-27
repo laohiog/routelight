@@ -9,6 +9,31 @@ pub struct LocalNetworkInfo {
     pub gateways: Vec<String>,
 }
 
+const SUSPECTED_TUN_KEYWORDS: [&str; 13] = [
+    "tun",
+    "tap",
+    "wintun",
+    "clash",
+    "mihomo",
+    "meta",
+    "v2ray",
+    "sing-box",
+    "vpn",
+    "openvpn",
+    "wireguard",
+    "tailscale",
+    "zerotier",
+];
+
+fn is_suspected_tun_adapter(friendly_name: &str, description: &str) -> bool {
+    let friendly_name = friendly_name.to_lowercase();
+    let description = description.to_lowercase();
+
+    SUSPECTED_TUN_KEYWORDS
+        .iter()
+        .any(|keyword| friendly_name.contains(keyword) || description.contains(keyword))
+}
+
 fn format_system_proxy(proxy_enable: u32, proxy_server: &str, auto_config_url: &str) -> String {
     let manual_proxy_enabled = proxy_enable == 1 && !proxy_server.is_empty();
 
@@ -47,31 +72,7 @@ pub fn probe_local_network() -> LocalNetworkInfo {
     if let Ok(adapters) = ipconfig::get_adapters() {
         for adapter in adapters {
             if adapter.oper_status() == ipconfig::OperStatus::IfOperStatusUp {
-                let name = adapter.friendly_name().to_lowercase();
-                let desc = adapter.description().to_lowercase();
-
-                let is_tun = name.contains("tun")
-                    || name.contains("tap")
-                    || name.contains("wintun")
-                    || name.contains("clash")
-                    || name.contains("mihomo")
-                    || name.contains("sing-box")
-                    || name.contains("vpn")
-                    || name.contains("wireguard")
-                    || name.contains("tailscale")
-                    || name.contains("zerotier")
-                    || desc.contains("tun")
-                    || desc.contains("tap")
-                    || desc.contains("wintun")
-                    || desc.contains("clash")
-                    || desc.contains("mihomo")
-                    || desc.contains("sing-box")
-                    || desc.contains("vpn")
-                    || desc.contains("wireguard")
-                    || desc.contains("tailscale")
-                    || desc.contains("zerotier");
-
-                if is_tun {
+                if is_suspected_tun_adapter(adapter.friendly_name(), adapter.description()) {
                     tun_adapters.push(adapter.friendly_name().to_string());
                 }
 
@@ -102,7 +103,30 @@ pub fn probe_local_network() -> LocalNetworkInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::format_system_proxy;
+    use super::{format_system_proxy, is_suspected_tun_adapter};
+
+    #[test]
+    fn detects_new_keywords_case_insensitively_in_friendly_names() {
+        for keyword in ["MeTa", "V2Ray", "OpenVPN"] {
+            assert!(is_suspected_tun_adapter(keyword, ""));
+        }
+    }
+
+    #[test]
+    fn detects_new_keywords_case_insensitively_in_descriptions() {
+        for keyword in ["mETA", "V2RAY", "oPeNvPn"] {
+            assert!(is_suspected_tun_adapter("Ethernet Adapter", keyword));
+        }
+    }
+
+    #[test]
+    fn still_detects_existing_keyword_and_ignores_ordinary_adapter_text() {
+        assert!(is_suspected_tun_adapter("Wintun Adapter", ""));
+        assert!(!is_suspected_tun_adapter(
+            "Ethernet Adapter",
+            "Generic network interface"
+        ));
+    }
 
     #[test]
     fn formats_enabled_manual_proxy_and_pac_together() {
