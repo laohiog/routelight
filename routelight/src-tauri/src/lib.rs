@@ -232,8 +232,11 @@ pub fn run() {
             // 2. Create menu items
             let open_item = MenuItemBuilder::with_id("open", "Open / 打开").build(app)?;
             let refresh_item = MenuItemBuilder::with_id("refresh", "Refresh / 刷新").build(app)?;
-            let copy_item =
-                MenuItemBuilder::with_id("copy", "Copy Diagnostics / 复制诊断信息").build(app)?;
+            let copy_item = MenuItemBuilder::with_id(
+                "copy",
+                "Copy Full Diagnostics (IP/proxy/DNS/gateway) / 复制完整诊断",
+            )
+            .build(app)?;
             let exit_item = MenuItemBuilder::with_id("exit", "Exit / 退出").build(app)?;
 
             // 3. Build the menu

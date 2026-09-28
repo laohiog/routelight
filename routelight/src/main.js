@@ -266,7 +266,7 @@ async function copyDiagnostics() {
     logDebug("diagnostics copied successfully");
 
     setTimeout(() => {
-      copyBtn.textContent = "复制诊断";
+      copyBtn.textContent = "复制完整诊断";
       copyBtn.disabled = false;
     }, 1000);
   } catch (err) {
@@ -274,7 +274,7 @@ async function copyDiagnostics() {
     logDebug(`[frontend] copy diagnostics error: ${errMsg}`);
     copyBtn.textContent = "复制失败";
     setTimeout(() => {
-      copyBtn.textContent = "复制诊断";
+      copyBtn.textContent = "复制完整诊断";
       copyBtn.disabled = false;
     }, 1000);
   }
