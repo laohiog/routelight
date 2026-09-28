@@ -8,11 +8,16 @@ This repository contains the RouteLight desktop app. The main app lives in `rout
 
 Run these from `routelight/` unless noted:
 
-- `npm install` installs the Tauri CLI and frontend dependencies.
+- `npm ci` installs the frontend and Tauri CLI dependencies reproducibly, as in CI; use `npm install` for local dependency updates.
 - `npm run tauri dev` starts the Windows Tauri app in development mode.
 - `$env:ROUTELIGHT_MOCK_STATUS="normal"; npm run tauri dev` starts mock status rendering; valid examples include `normal`, `warning`, and `error`.
 - `npm run tauri build` creates Windows release artifacts under `src-tauri/target/release/`.
-- `cargo test` from `routelight/src-tauri/` runs Rust tests when tests are added.
+- The CI validation commands, run from `routelight/`, are:
+  - `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
+  - `cargo check --manifest-path src-tauri/Cargo.toml --locked`
+  - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings`
+  - `cargo test --manifest-path src-tauri/Cargo.toml --locked`
+  - `npm run build`
 
 ## Coding Style & Naming Conventions
 
@@ -20,7 +25,7 @@ Use two-space indentation in JavaScript/CSS and standard `rustfmt` formatting fo
 
 ## Testing Guidelines
 
-There is no committed automated test suite yet. For Rust changes, add focused unit tests near the relevant module and run `cargo test`. For frontend or tray behavior, verify manually with `npm run tauri dev` and the mock status environment variable. Network-probe changes should document which live endpoints were exercised and whether mock mode was used.
+Focused Rust unit tests are already committed. For Rust behavior changes, add or update focused tests near the relevant module and run relevant existing tests with `cargo test --manifest-path src-tauri/Cargo.toml --locked`. CI is the authoritative repository gate for Rust format, check, Clippy, tests, and the Tauri build using the commands above. Frontend or tray behavior that is inherently visual or native should also receive manual verification when relevant, using `npm run tauri dev` and the mock status environment variable. Network-probe changes should document which live endpoints were exercised and whether mock mode was used.
 
 ## Commit & Pull Request Guidelines
 
